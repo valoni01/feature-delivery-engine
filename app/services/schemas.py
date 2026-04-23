@@ -11,6 +11,13 @@ class ServiceCreate(BaseModel):
     is_active: bool = True
 
 
+class ServiceUpdate(BaseModel):
+    name: str | None = Field(default=None, min_length=1, max_length=255)
+    description: str | None = None
+    department: str | None = Field(default=None, max_length=100)
+    is_active: bool | None = None
+
+
 class ServiceResponse(BaseModel):
     id: int
     name: str

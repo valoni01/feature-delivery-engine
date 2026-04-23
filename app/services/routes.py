@@ -4,7 +4,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.db import get_db
 from app.services.models import Service
-from app.services.schemas import ServiceCreate, ServiceResponse
+from app.services.schemas import ServiceCreate, ServiceResponse, ServiceUpdate
 
 router = APIRouter(prefix="/services", tags=["services"])
 
@@ -60,11 +60,48 @@ async def get_service(
     db: AsyncSession = Depends(get_db),
 ) -> Service:
     service = await db.get(Service, service_id)
+    if not service:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Service not found.",
+        )
+    return service
 
+
+@router.patch("/{service_id}", response_model=ServiceResponse)
+async def update_service(
+    service_id: int,
+    payload: ServiceUpdate,
+    db: AsyncSession = Depends(get_db),
+) -> Service:
+    service = await db.get(Service, service_id)
     if not service:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Service not found.",
         )
 
+    update_data = payload.model_dump(exclude_unset=True)
+    for field, value in update_data.items():
+        setattr(service, field, value)
+
+    await db.commit()
+    await db.refresh(service)
+
     return service
+
+
+@router.delete("/{service_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def deactivate_service(
+    service_id: int,
+    db: AsyncSession = Depends(get_db),
+) -> None:
+    service = await db.get(Service, service_id)
+    if not service:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Service not found.",
+        )
+
+    service.is_active = False
+    await db.commit()
