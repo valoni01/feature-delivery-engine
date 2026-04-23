@@ -1,8 +1,9 @@
 from unittest.mock import AsyncMock, MagicMock, patch
 
 from app.agents.frd_parser import (
+    EvaluationDecision,
     RequirementSummary,
-    analyze_frd,
+    evaluate_frd,
     finalize_frd,
 )
 
@@ -77,26 +78,28 @@ def _mock_track():
     return mock_track_fn, mock_run
 
 
-class TestAnalyzeFRD:
-    async def test_analyze_returns_questions(self):
-        from app.agents.frd_parser import AnalysisResult, ClarifyingQuestionItem
+class TestEvaluateFRD:
+    async def test_evaluate_asks_questions_no_context(self):
+        from app.agents.frd_parser import ClarifyingQuestionItem
 
-        analysis = AnalysisResult(
+        decision = EvaluationDecision(
+            ready_to_finalize=False,
             codebase_observations="Found existing notification module at /services/notify",
             clarifying_questions=[
                 ClarifyingQuestionItem(
                     id="Q-1",
-                    question="Should quiet hours apply globally?",
-                    context="The FRD mentions quiet hours but doesn't specify scope.",
+                    question="Should quiet hours apply to all users or just certain groups?",
+                    why="This affects who receives notifications and when.",
                 ),
             ],
+            reasoning="Need to understand quiet hours scope before proceeding.",
         )
 
         mock_llm = _make_mock_llm()
         mock_llm.chat.completions.create.return_value = _mock_tool_response(
             content="I found an existing notification service. Here is my analysis..."
         )
-        mock_llm.beta.chat.completions.parse.return_value = _mock_parsed_response(analysis)
+        mock_llm.beta.chat.completions.parse.return_value = _mock_parsed_response(decision)
 
         state = {
             "workflow_id": 1,
@@ -108,26 +111,55 @@ class TestAnalyzeFRD:
         track_fn, _ = _mock_track()
 
         with patch("app.agents.frd_parser.get_llm_client", return_value=mock_llm), \
-             patch("app.agents.frd_parser.track_agent_run", track_fn):
-            result = await analyze_frd(state)
+             patch("app.agents.frd_parser.track_agent_run", track_fn), \
+             patch("app.agents.frd_parser.read_context", return_value=None):
+            result = await evaluate_frd(state)
 
-        assert "clarifying_questions" in result
+        assert result["ready_to_finalize"] is False
         assert len(result["clarifying_questions"]) == 1
         assert result["clarifying_questions"][0]["id"] == "Q-1"
-        assert "codebase_context" in result
-        assert result["current_step"] == "analyzing"
+        assert result["context_file_created"] is True
 
-    async def test_analyze_no_questions(self):
-        from app.agents.frd_parser import AnalysisResult
-
-        analysis = AnalysisResult(
-            codebase_observations="Codebase is straightforward.",
+    async def test_evaluate_with_existing_context(self):
+        decision = EvaluationDecision(
+            ready_to_finalize=False,
+            codebase_observations="Project uses FastAPI with async routes.",
             clarifying_questions=[],
+            reasoning="FRD is clear but want to check one thing.",
         )
 
         mock_llm = _make_mock_llm()
         mock_llm.chat.completions.create.return_value = _mock_tool_response(content="All clear.")
-        mock_llm.beta.chat.completions.parse.return_value = _mock_parsed_response(analysis)
+        mock_llm.beta.chat.completions.parse.return_value = _mock_parsed_response(decision)
+
+        state = {
+            "workflow_id": 1,
+            "model": "gpt-4o",
+            "feature_doc_text": SAMPLE_FRD,
+            "repo_path": "/fake/repo",
+        }
+
+        track_fn, _ = _mock_track()
+        existing_context = "# Project\nPython FastAPI app with async routes."
+
+        with patch("app.agents.frd_parser.get_llm_client", return_value=mock_llm), \
+             patch("app.agents.frd_parser.track_agent_run", track_fn), \
+             patch("app.agents.frd_parser.read_context", return_value=existing_context):
+            result = await evaluate_frd(state)
+
+        assert result["context_file_created"] is False
+
+    async def test_evaluate_ready_to_finalize(self):
+        decision = EvaluationDecision(
+            ready_to_finalize=True,
+            codebase_observations="Codebase is straightforward.",
+            clarifying_questions=[],
+            reasoning="The FRD is complete and I understand the codebase well.",
+        )
+
+        mock_llm = _make_mock_llm()
+        mock_llm.chat.completions.create.return_value = _mock_tool_response(content="All clear.")
+        mock_llm.beta.chat.completions.parse.return_value = _mock_parsed_response(decision)
 
         state = {
             "workflow_id": 1,
@@ -139,14 +171,50 @@ class TestAnalyzeFRD:
         track_fn, _ = _mock_track()
 
         with patch("app.agents.frd_parser.get_llm_client", return_value=mock_llm), \
-             patch("app.agents.frd_parser.track_agent_run", track_fn):
-            result = await analyze_frd(state)
+             patch("app.agents.frd_parser.track_agent_run", track_fn), \
+             patch("app.agents.frd_parser.read_context", return_value=None):
+            result = await evaluate_frd(state)
 
+        assert result["ready_to_finalize"] is True
         assert result["clarifying_questions"] == []
+
+    async def test_evaluate_includes_conversation_history(self):
+        decision = EvaluationDecision(
+            ready_to_finalize=True,
+            codebase_observations="After user clarified, all is clear.",
+            clarifying_questions=[],
+            reasoning="User answered all questions.",
+        )
+
+        mock_llm = _make_mock_llm()
+        mock_llm.chat.completions.create.return_value = _mock_tool_response(content="Good.")
+        mock_llm.beta.chat.completions.parse.return_value = _mock_parsed_response(decision)
+
+        state = {
+            "workflow_id": 1,
+            "model": "gpt-4o",
+            "feature_doc_text": SAMPLE_FRD,
+            "repo_path": "/fake/repo",
+            "conversation_history": [
+                {
+                    "questions": [{"id": "Q-1", "question": "Quiet hours?", "why": "Affects notification timing"}],
+                    "answers": {"Q-1": "Yes, global"},
+                }
+            ],
+        }
+
+        track_fn, _ = _mock_track()
+
+        with patch("app.agents.frd_parser.get_llm_client", return_value=mock_llm), \
+             patch("app.agents.frd_parser.track_agent_run", track_fn), \
+             patch("app.agents.frd_parser.read_context", return_value="some context"):
+            result = await evaluate_frd(state)
+
+        assert result["ready_to_finalize"] is True
 
 
 class TestFinalizeFRD:
-    async def test_finalize_with_answers(self):
+    async def test_finalize_with_conversation_history(self):
         summary = RequirementSummary(**SAMPLE_REQUIREMENT_SUMMARY)
 
         mock_llm = _make_mock_llm()
@@ -157,8 +225,12 @@ class TestFinalizeFRD:
             "model": "gpt-4o",
             "feature_doc_text": SAMPLE_FRD,
             "codebase_context": "Found existing notify module.",
-            "clarifying_questions": [{"id": "Q-1", "question": "Quiet hours scope?", "context": "..."}],
-            "clarification_answers": {"Q-1": "Global quiet hours"},
+            "conversation_history": [
+                {
+                    "questions": [{"id": "Q-1", "question": "Quiet hours scope?", "why": "Affects which users get notified"}],
+                    "answers": {"Q-1": "Global quiet hours"},
+                },
+            ],
         }
 
         track_fn, _ = _mock_track()
@@ -170,9 +242,9 @@ class TestFinalizeFRD:
         assert "requirement_summary" in result
         assert result["requirement_summary"]["title"] == "User Notification System"
         assert len(result["requirement_summary"]["functional_requirements"]) == 2
-        assert result["current_step"] == "parsing"
+        assert result["current_step"] == "parsing_complete"
 
-    async def test_finalize_without_answers(self):
+    async def test_finalize_without_conversation(self):
         summary = RequirementSummary(**SAMPLE_REQUIREMENT_SUMMARY)
 
         mock_llm = _make_mock_llm()
@@ -218,3 +290,29 @@ class TestRequirementSummaryValidation:
         ]
         with pytest.raises(Exception):
             RequirementSummary(**bad_data)
+
+
+class TestEvaluationDecisionValidation:
+    def test_ready_with_no_questions(self):
+        d = EvaluationDecision(
+            ready_to_finalize=True,
+            codebase_observations="Clear.",
+            clarifying_questions=[],
+            reasoning="FRD is complete.",
+        )
+        assert d.ready_to_finalize is True
+        assert d.clarifying_questions == []
+
+    def test_not_ready_with_questions(self):
+        from app.agents.frd_parser import ClarifyingQuestionItem
+
+        d = EvaluationDecision(
+            ready_to_finalize=False,
+            codebase_observations="Found existing auth module.",
+            clarifying_questions=[
+                ClarifyingQuestionItem(id="Q-1", question="Should all users need to log in, or just admins?", why="Determines who needs authentication")
+            ],
+            reasoning="Need to know auth approach.",
+        )
+        assert d.ready_to_finalize is False
+        assert len(d.clarifying_questions) == 1

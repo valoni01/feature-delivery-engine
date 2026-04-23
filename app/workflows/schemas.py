@@ -22,7 +22,8 @@ class WorkflowCreate(BaseModel):
     service_id: int
     title: str = Field(..., min_length=1, max_length=255)
     feature_doc_text: str = Field(..., min_length=1)
-    repo_path: str = Field(..., min_length=1, description="Absolute path to the repository to analyze")
+    repo_url: str = Field(..., min_length=1, description="GitHub repository URL, e.g. https://github.com/owner/repo")
+    branch: str | None = Field(default=None, description="Branch to clone. Defaults to the repo's default branch.")
 
 
 class WorkflowUpdate(BaseModel):
@@ -39,9 +40,13 @@ class WorkflowResponse(BaseModel):
     title: str
     status: str
     feature_doc_text: str
+    repo_url: str
+    branch: str | None
+    pending_questions: list[dict[str, Any]] | None
     requirement_summary: dict[str, Any] | None
     technical_design: dict[str, Any] | None
     tasks: list[dict[str, Any]] | None
+    pr_url: str | None
     created_at: datetime
     updated_at: datetime
 
@@ -51,7 +56,7 @@ class WorkflowResponse(BaseModel):
 class ClarificationQuestion(BaseModel):
     id: str
     question: str
-    context: str
+    why: str
 
 
 class ClarificationResponse(BaseModel):

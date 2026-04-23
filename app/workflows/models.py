@@ -18,11 +18,15 @@ class Workflow(Base):
     title: Mapped[str] = mapped_column(String(255), nullable=False)
     status: Mapped[str] = mapped_column(String(50), nullable=False, default="draft")
     feature_doc_text: Mapped[str] = mapped_column(nullable=False)
-    repo_path: Mapped[str] = mapped_column(String(500), nullable=False)
+    repo_url: Mapped[str] = mapped_column(String(500), nullable=False)
+    branch: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    repo_local_path: Mapped[str | None] = mapped_column(String(500), nullable=True)
 
+    pending_questions: Mapped[list | None] = mapped_column(JSONB, nullable=True)
     requirement_summary: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
     technical_design: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
     tasks: Mapped[list | None] = mapped_column(JSONB, nullable=True)
+    pr_url: Mapped[str | None] = mapped_column(String(500), nullable=True)
 
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False

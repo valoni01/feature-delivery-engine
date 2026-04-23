@@ -4,7 +4,13 @@ from typing import Any, TypedDict
 class ClarifyingQuestion(TypedDict):
     id: str
     question: str
-    context: str
+    why: str
+
+
+class ConversationRound(TypedDict):
+    """One round of Q&A between the agent and the user."""
+    questions: list[ClarifyingQuestion]
+    answers: dict[str, str]
 
 
 class PipelineState(TypedDict, total=False):
@@ -17,15 +23,20 @@ class PipelineState(TypedDict, total=False):
     # Identifiers
     workflow_id: int
     model: str
-    repo_path: str
+    repo_url: str
+    repo_path: str  # local clone path — set by the route after cloning
+    github_token: str  # user-provided token for push/PR
 
     # Input
     feature_doc_text: str
 
-    # FRD parsing (two-step: analyze → clarify → finalize)
+    # FRD parsing (multi-round conversational)
     codebase_context: str
-    clarifying_questions: list[ClarifyingQuestion]
-    clarification_answers: dict[str, str]
+    clarifying_questions: list[ClarifyingQuestion]  # current round's questions
+    clarification_answers: dict[str, str]  # current round's answers
+    conversation_history: list[ConversationRound]  # all past rounds
+    ready_to_finalize: bool  # agent signals it has enough info
+    context_file_created: bool
     requirement_summary: dict[str, Any]
 
     # Design & review
@@ -41,3 +52,4 @@ class PipelineState(TypedDict, total=False):
     # Tracking
     current_step: str
     error: str | None
+    _review_count: int

@@ -12,6 +12,9 @@ class Settings(BaseSettings):
     openai_api_key: str = ""
     default_model: str = "gpt-4o"
 
+    github_token: str = ""
+    repo_workspace_dir: str = "/tmp/fde-workspaces"
+
     @property
     def async_database_url(self) -> str:
         return self.database_url.replace("+psycopg", "+psycopg_async", 1)
