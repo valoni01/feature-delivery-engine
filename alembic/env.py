@@ -5,6 +5,7 @@ from alembic import context
 
 from app.core.config import get_settings
 from app.core.db import Base
+from app.agents.models import AgentRun
 from app.services.models import Service
 from app.integrations.models import ServiceIntegration
 from app.workflows.models import Workflow

@@ -9,6 +9,9 @@ class Settings(BaseSettings):
     api_v1_prefix: str = "/api/v1"
     database_url: str = "postgresql+psycopg://postgres:postgres@localhost:5432/feature_delivery"
 
+    openai_api_key: str = ""
+    default_model: str = "gpt-4o"
+
     @property
     def async_database_url(self) -> str:
         return self.database_url.replace("+psycopg", "+psycopg_async", 1)

@@ -1,10 +1,11 @@
 from fastapi import FastAPI
 
+from app.core.llm import lifespan
 from app.integrations.routes import router as integrations_router
 from app.services.routes import router as services_router
 from app.workflows.routes import router as workflows_router
 
-app = FastAPI(title="Feature Delivery Copilot API")
+app = FastAPI(title="Feature Delivery Copilot API", lifespan=lifespan)
 
 
 @app.get("/health")
