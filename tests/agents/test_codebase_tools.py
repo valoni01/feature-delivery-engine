@@ -1,0 +1,83 @@
+import os
+import tempfile
+
+import pytest
+
+from app.agents.tools.codebase import list_directory, read_file, search_files
+
+
+@pytest.fixture
+def temp_repo():
+    """Creates a temporary directory structure simulating a small repo."""
+    with tempfile.TemporaryDirectory() as tmpdir:
+        os.makedirs(os.path.join(tmpdir, "src"))
+        os.makedirs(os.path.join(tmpdir, "src", "utils"))
+
+        with open(os.path.join(tmpdir, "README.md"), "w") as f:
+            f.write("# My Project\nA sample project.")
+
+        with open(os.path.join(tmpdir, "src", "main.py"), "w") as f:
+            f.write("from utils.helper import greet\n\ndef main():\n    greet('world')\n")
+
+        with open(os.path.join(tmpdir, "src", "utils", "helper.py"), "w") as f:
+            f.write("def greet(name: str) -> str:\n    return f'Hello, {name}!'\n")
+
+        yield tmpdir
+
+
+class TestReadFile:
+    def test_read_existing_file(self, temp_repo):
+        content = read_file(temp_repo, "README.md")
+        assert "My Project" in content
+
+    def test_read_nested_file(self, temp_repo):
+        content = read_file(temp_repo, "src/main.py")
+        assert "def main" in content
+
+    def test_read_nonexistent_file(self, temp_repo):
+        with pytest.raises(FileNotFoundError):
+            read_file(temp_repo, "nope.txt")
+
+    def test_path_traversal_blocked(self, temp_repo):
+        with pytest.raises(PermissionError):
+            read_file(temp_repo, "../../etc/passwd")
+
+
+class TestListDirectory:
+    def test_list_root(self, temp_repo):
+        tree = list_directory(temp_repo, ".")
+        assert "README.md" in tree
+        assert "src/" in tree
+
+    def test_list_subdirectory(self, temp_repo):
+        tree = list_directory(temp_repo, "src")
+        assert "main.py" in tree
+        assert "utils/" in tree
+
+    def test_list_nonexistent_dir(self, temp_repo):
+        with pytest.raises(FileNotFoundError):
+            list_directory(temp_repo, "nonexistent")
+
+    def test_path_traversal_blocked(self, temp_repo):
+        with pytest.raises(PermissionError):
+            list_directory(temp_repo, "../../")
+
+
+class TestSearchFiles:
+    def test_search_finds_match(self, temp_repo):
+        results = search_files(temp_repo, "greet")
+        assert "helper.py" in results
+        assert "main.py" in results
+
+    def test_search_case_insensitive(self, temp_repo):
+        results = search_files(temp_repo, "HELLO")
+        assert "helper.py" in results
+
+    def test_search_with_extension_filter(self, temp_repo):
+        results = search_files(temp_repo, "Project", file_extension=".md")
+        assert "README.md" in results
+        assert ".py" not in results
+
+    def test_search_no_results(self, temp_repo):
+        results = search_files(temp_repo, "nonexistent_string_xyz")
+        assert "No matches found" in results

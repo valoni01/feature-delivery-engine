@@ -18,6 +18,7 @@ class Workflow(Base):
     title: Mapped[str] = mapped_column(String(255), nullable=False)
     status: Mapped[str] = mapped_column(String(50), nullable=False, default="draft")
     feature_doc_text: Mapped[str] = mapped_column(nullable=False)
+    repo_path: Mapped[str] = mapped_column(String(500), nullable=False)
 
     requirement_summary: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
     technical_design: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
