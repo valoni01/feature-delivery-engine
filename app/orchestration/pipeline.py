@@ -2,6 +2,7 @@ from langgraph.checkpoint.memory import MemorySaver
 from langgraph.graph import END, StateGraph
 from langgraph.types import interrupt
 
+from app.agents.code_reviewer import review_code
 from app.agents.design_reviewer import review_design
 from app.agents.frd_parser import evaluate_frd, finalize_frd
 from app.agents.implementer import implement_tasks
@@ -11,6 +12,7 @@ from app.agents.task_planner import plan_tasks
 from app.agents.tech_designer import create_technical_design
 
 MAX_REVIEW_ROUNDS = 3
+MAX_CODE_REVIEW_ROUNDS = 2
 
 
 async def wait_for_clarification(state: PipelineState) -> dict:
@@ -76,6 +78,31 @@ async def rework_design(state: PipelineState) -> dict:
     return {"_review_count": review_count}
 
 
+def after_code_review(state: PipelineState) -> str:
+    """Route after code review: proceed to PR or loop back for fixes."""
+    if state.get("code_review_decision") == "approved":
+        return "create_pr"
+    return "fix_code"
+
+
+async def fix_code(state: PipelineState) -> dict:
+    """Thin wrapper: re-runs implementation with code review feedback.
+
+    The implementer will see the feedback and fix the flagged issues.
+    Capped to prevent infinite loops.
+    """
+    count = state.get("_code_review_count", 0) + 1
+
+    if count >= MAX_CODE_REVIEW_ROUNDS:
+        return {
+            "code_review_decision": "approved",
+            "_code_review_count": count,
+            "current_step": "code_auto_approved",
+        }
+
+    return {"_code_review_count": count}
+
+
 def build_pipeline() -> StateGraph:
     """Constructs the full FDE pipeline graph.
 
@@ -88,7 +115,7 @@ def build_pipeline() -> StateGraph:
               ↓
         plan_tasks
               ↓
-        implement_tasks
+        implement_tasks ←→ review_code (fix loop, max 2 rounds)
               ↓
         create_pr
               ↓
@@ -109,6 +136,8 @@ def build_pipeline() -> StateGraph:
     # Execution nodes
     graph.add_node("plan_tasks", plan_tasks)
     graph.add_node("implement_tasks", implement_tasks)
+    graph.add_node("review_code", review_code)
+    graph.add_node("fix_code", fix_code)
     graph.add_node("create_pr", create_pr)
 
     # Entry
@@ -140,7 +169,19 @@ def build_pipeline() -> StateGraph:
 
     # Execution chain
     graph.add_edge("plan_tasks", "implement_tasks")
-    graph.add_edge("implement_tasks", "create_pr")
+    graph.add_edge("implement_tasks", "review_code")
+
+    # Code review loop
+    graph.add_conditional_edges(
+        "review_code",
+        after_code_review,
+        {
+            "create_pr": "create_pr",
+            "fix_code": "fix_code",
+        },
+    )
+    graph.add_edge("fix_code", "implement_tasks")
+
     graph.add_edge("create_pr", END)
 
     return graph

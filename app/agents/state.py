@@ -47,6 +47,13 @@ class PipelineState(TypedDict, total=False):
     # Ticketing & implementation
     tasks: list[dict[str, Any]]
     implementation_result: dict[str, Any]
+
+    # Code review
+    code_review_decision: str  # "approved" or "needs_rework"
+    code_review_feedback: str
+    _code_review_count: int
+
+    # PR
     pr_url: str
 
     # Tracking

@@ -8,3 +8,23 @@ wheels/
 
 # Virtual environments
 .venv
+
+# Environment variables
+.env
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Testing
+.pytest_cache/
+.coverage
+htmlcov/
+
+# FDE agent context
+.fde/
+
+# OS
+.DS_Store

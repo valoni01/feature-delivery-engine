@@ -66,6 +66,8 @@ async def _sync_workflow_from_result(
         workflow.status = WorkflowStatus.COMPLETED
     elif step == "pr_created":
         workflow.status = WorkflowStatus.PR_CREATED
+    elif step in ("code_reviewing", "code_auto_approved"):
+        workflow.status = WorkflowStatus.CODE_REVIEWING
     elif step == "implementing":
         workflow.status = WorkflowStatus.IMPLEMENTING
     elif step == "ticketing":
@@ -88,7 +90,8 @@ VALID_TRANSITIONS: dict[WorkflowStatus, list[WorkflowStatus]] = {
     WorkflowStatus.DESIGNING: [WorkflowStatus.REVIEWING, WorkflowStatus.FAILED],
     WorkflowStatus.REVIEWING: [WorkflowStatus.DESIGNING, WorkflowStatus.TICKETING, WorkflowStatus.FAILED],
     WorkflowStatus.TICKETING: [WorkflowStatus.IMPLEMENTING, WorkflowStatus.FAILED],
-    WorkflowStatus.IMPLEMENTING: [WorkflowStatus.PR_CREATED, WorkflowStatus.FAILED],
+    WorkflowStatus.IMPLEMENTING: [WorkflowStatus.CODE_REVIEWING, WorkflowStatus.FAILED],
+    WorkflowStatus.CODE_REVIEWING: [WorkflowStatus.IMPLEMENTING, WorkflowStatus.PR_CREATED, WorkflowStatus.FAILED],
     WorkflowStatus.PR_CREATED: [WorkflowStatus.COMPLETED, WorkflowStatus.FAILED],
     WorkflowStatus.COMPLETED: [],
     WorkflowStatus.FAILED: [WorkflowStatus.DRAFT],

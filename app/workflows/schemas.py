@@ -13,6 +13,7 @@ class WorkflowStatus(StrEnum):
     REVIEWING = "reviewing"
     TICKETING = "ticketing"
     IMPLEMENTING = "implementing"
+    CODE_REVIEWING = "code_reviewing"
     PR_CREATED = "pr_created"
     COMPLETED = "completed"
     FAILED = "failed"
