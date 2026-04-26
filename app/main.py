@@ -1,4 +1,7 @@
+import os
+
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 
 from app.core.llm import lifespan
 from app.core.logging import setup_logging
@@ -12,6 +15,15 @@ setup_logging()
 init_telemetry()
 
 app = FastAPI(title="Feature Delivery Copilot API", lifespan=lifespan)
+
+allowed_origins = os.getenv("CORS_ORIGINS", "http://localhost:4200").split(",")
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=allowed_origins,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 instrument_app(app)
 
