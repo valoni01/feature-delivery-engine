@@ -5,10 +5,22 @@ from langgraph.types import Command
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.agents.models import AgentRun
 from app.agents.pr_creator import push_and_create_pr
 from app.agents.tools.repo_manager import clone_repo
 from app.core.config import get_settings
 from app.core.db import get_db
+from app.orchestration.pipeline import pipeline
+from app.services.models import Service
+from app.workflows.models import Workflow
+from app.workflows.schemas import (
+    AgentRunResponse,
+    ClarificationAnswers,
+    WorkflowCreate,
+    WorkflowResponse,
+    WorkflowStatus,
+    WorkflowUpdate,
+)
 
 
 def _extract_token(authorization: str | None) -> str:
@@ -16,16 +28,6 @@ def _extract_token(authorization: str | None) -> str:
     if not authorization:
         return ""
     return authorization.removeprefix("Bearer ").strip()
-from app.orchestration.pipeline import pipeline
-from app.services.models import Service
-from app.workflows.models import Workflow
-from app.workflows.schemas import (
-    ClarificationAnswers,
-    WorkflowCreate,
-    WorkflowResponse,
-    WorkflowStatus,
-    WorkflowUpdate,
-)
 
 router = APIRouter(prefix="/workflows", tags=["workflows"])
 
@@ -382,6 +384,27 @@ async def get_workflow(
             detail="Workflow not found.",
         )
     return workflow
+
+
+@router.get("/{workflow_id}/agent-runs", response_model=list[AgentRunResponse])
+async def get_agent_runs(
+    workflow_id: int,
+    db: AsyncSession = Depends(get_db),
+) -> list[AgentRun]:
+    """Get all agent runs for a workflow, ordered chronologically."""
+    workflow = await db.get(Workflow, workflow_id)
+    if not workflow:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Workflow not found.",
+        )
+
+    result = await db.execute(
+        select(AgentRun)
+        .where(AgentRun.workflow_id == workflow_id)
+        .order_by(AgentRun.created_at.asc())
+    )
+    return list(result.scalars().all())
 
 
 @router.patch("/{workflow_id}", response_model=WorkflowResponse)

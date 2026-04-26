@@ -11,8 +11,8 @@ class Workflow(Base):
     __tablename__ = "workflows"
 
     id: Mapped[int] = mapped_column(primary_key=True, index=True)
-    service_id: Mapped[int] = mapped_column(
-        ForeignKey("services.id"), nullable=False, index=True
+    service_id: Mapped[int | None] = mapped_column(
+        ForeignKey("services.id"), nullable=True, index=True
     )
 
     title: Mapped[str] = mapped_column(String(255), nullable=False)

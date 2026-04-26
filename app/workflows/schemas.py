@@ -20,7 +20,7 @@ class WorkflowStatus(StrEnum):
 
 
 class WorkflowCreate(BaseModel):
-    service_id: int
+    service_id: int | None = None
     title: str = Field(..., min_length=1, max_length=255)
     feature_doc_text: str = Field(..., min_length=1)
     repo_url: str = Field(..., min_length=1, description="GitHub repository URL, e.g. https://github.com/owner/repo")
@@ -37,7 +37,7 @@ class WorkflowUpdate(BaseModel):
 
 class WorkflowResponse(BaseModel):
     id: int
-    service_id: int
+    service_id: int | None
     title: str
     status: str
     feature_doc_text: str
@@ -50,6 +50,20 @@ class WorkflowResponse(BaseModel):
     pr_url: str | None
     created_at: datetime
     updated_at: datetime
+
+    model_config = {"from_attributes": True}
+
+
+class AgentRunResponse(BaseModel):
+    id: int
+    workflow_id: int
+    agent_name: str
+    status: str
+    model_used: str | None
+    tokens_used: int | None
+    duration_ms: int | None
+    error: str | None
+    created_at: datetime
 
     model_config = {"from_attributes": True}
 

@@ -15,9 +15,18 @@ class Settings(BaseSettings):
     github_token: str = ""
     repo_workspace_dir: str = "/tmp/fde-workspaces"
 
+    # Observability
+    otel_exporter_otlp_endpoint: str = ""
+    otel_exporter_otlp_headers: str = ""
+    sentry_dsn: str = ""
+    otel_service_name: str = "fde-backend"
+
     @property
     def async_database_url(self) -> str:
-        return self.database_url.replace("+psycopg", "+psycopg_async", 1)
+        url = self.database_url
+        if "+psycopg" in url:
+            return url.replace("+psycopg", "+psycopg_async", 1)
+        return url.replace("postgresql://", "postgresql+psycopg_async://", 1)
 
     model_config = SettingsConfigDict(
         env_file=".env",
