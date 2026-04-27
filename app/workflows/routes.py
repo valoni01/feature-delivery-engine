@@ -109,12 +109,13 @@ async def create_workflow(
     payload: WorkflowCreate,
     db: AsyncSession = Depends(get_db),
 ) -> Workflow:
-    service = await db.get(Service, payload.service_id)
-    if not service:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Service not found.",
-        )
+    if payload.service_id is not None:
+        service = await db.get(Service, payload.service_id)
+        if not service:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Service not found.",
+            )
 
     workflow = Workflow(
         service_id=payload.service_id,
