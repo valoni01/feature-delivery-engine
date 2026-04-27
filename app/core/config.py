@@ -1,7 +1,25 @@
+import os
 from functools import lru_cache
+from typing import Self
+from urllib.parse import quote_plus
 
-from pydantic import field_validator
+from pydantic import field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+
+def _database_url_from_split_postgres_environ() -> str | None:
+    """Build a URL from libpq-style env vars (Railway/Render inject these for linked Postgres)."""
+    host = os.getenv("PGHOST") or os.getenv("POSTGRES_HOST")
+    if not host or not host.strip():
+        return None
+    user = os.getenv("PGUSER") or os.getenv("POSTGRES_USER") or "postgres"
+    password = os.getenv("PGPASSWORD") or os.getenv("POSTGRES_PASSWORD") or ""
+    port = os.getenv("PGPORT") or os.getenv("POSTGRES_PORT") or "5432"
+    database = os.getenv("PGDATABASE") or os.getenv("POSTGRES_DB") or "postgres"
+    user_q = quote_plus(user)
+    password_q = quote_plus(password) if password else ""
+    auth = f"{user_q}:{password_q}@" if password else f"{user_q}@"
+    return f"postgresql+psycopg://{auth}{host.strip()}:{port.strip()}/{database.strip()}"
 
 
 class Settings(BaseSettings):
@@ -26,13 +44,19 @@ class Settings(BaseSettings):
     @classmethod
     def _strip_database_url(cls, v: object) -> object:
         if isinstance(v, str):
-            v = v.strip()
-            if v == "":
-                raise ValueError(
-                    "DATABASE_URL is set but empty. In Railway, link a Postgres add-on or set "
-                    "DATABASE_URL in Variables to a non-empty connection string."
-                )
+            return v.strip()
         return v
+
+    @model_validator(mode="after")
+    def _resolve_database_url_from_railway_pg_vars(self) -> Self:
+        """If DATABASE_URL is missing/empty but PG* vars exist, use them (linked Postgres on Railway)."""
+        explicit = os.environ.get("DATABASE_URL", "").strip()
+        if explicit:
+            return self
+        built = _database_url_from_split_postgres_environ()
+        if built:
+            self.database_url = built
+        return self
 
     @property
     def sync_database_url(self) -> str:
@@ -56,6 +80,8 @@ class Settings(BaseSettings):
         env_file=".env",
         env_file_encoding="utf-8",
         extra="ignore",
+        # Treat DATABASE_URL= as unset (otherwise it overrides the default with '').
+        env_ignore_empty=True,
     )
 
 
