@@ -1,5 +1,6 @@
 from functools import lru_cache
 
+from pydantic import field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -21,10 +22,25 @@ class Settings(BaseSettings):
     sentry_dsn: str = ""
     otel_service_name: str = "fde-backend"
 
+    @field_validator("database_url", mode="before")
+    @classmethod
+    def _strip_database_url(cls, v: object) -> object:
+        if isinstance(v, str):
+            v = v.strip()
+            if v == "":
+                raise ValueError(
+                    "DATABASE_URL is set but empty. In Railway, link a Postgres add-on or set "
+                    "DATABASE_URL in Variables to a non-empty connection string."
+                )
+        return v
+
     @property
     def sync_database_url(self) -> str:
-        """Normalized sync URL suitable for Alembic / plain SQLAlchemy."""
-        url = self.database_url
+        """Normalized sync URL suitable for Alembic / plain SQLAlchemy.
+
+        Accepts `postgres://`, `postgresql://`, and `postgresql+psycopg://` from the environment.
+        """
+        url = self.database_url.strip()
         if url.startswith("postgres://"):
             url = url.replace("postgres://", "postgresql+psycopg://", 1)
         elif url.startswith("postgresql://") and "+psycopg" not in url:

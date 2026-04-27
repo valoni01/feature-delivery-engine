@@ -1,6 +1,6 @@
 from logging.config import fileConfig
 
-from sqlalchemy import engine_from_config, pool
+from sqlalchemy import create_engine, pool
 from alembic import context
 
 from app.core.config import get_settings
@@ -16,7 +16,10 @@ if config.config_file_name is not None:
     fileConfig(config.config_file_name)
 
 settings = get_settings()
-config.set_main_option("sqlalchemy.url", settings.sync_database_url)
+# Use a Python-originated URL (not engine_from_config) so the string is always valid.
+# Railway/Docker set DATABASE_URL; env.py only needs a sync engine for migrations.
+_sync_url = settings.sync_database_url
+config.set_main_option("sqlalchemy.url", _sync_url)
 
 target_metadata = Base.metadata
 
@@ -30,9 +33,8 @@ def run_migrations_offline() -> None:
 
 
 def run_migrations_online() -> None:
-    connectable = engine_from_config(
-        config.get_section(config.config_ini_section, {}),
-        prefix="sqlalchemy.",
+    connectable = create_engine(
+        _sync_url,
         poolclass=pool.NullPool,
     )
 
