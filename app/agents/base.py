@@ -8,7 +8,7 @@ from opentelemetry import trace
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.agents.models import AgentRun
-from app.core.db import async_session
+from app.core.db import get_async_session
 
 logger = logging.getLogger(__name__)
 tracer = trace.get_tracer("fde.agents")
@@ -32,7 +32,7 @@ async def track_agent_run(
             run.tokens_used = usage.total_tokens
     """
     owns_session = db is None
-    session = db or async_session()
+    session = db or get_async_session()()
 
     run = AgentRun(
         workflow_id=workflow_id,

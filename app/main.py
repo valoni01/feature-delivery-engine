@@ -27,8 +27,8 @@ app.add_middleware(
 
 instrument_app(app)
 
-from app.core.db import engine  # noqa: E402
-instrument_db_engine(engine)
+from app.core.db import get_engine  # noqa: E402
+instrument_db_engine(get_engine())
 
 
 @app.get("/health")
