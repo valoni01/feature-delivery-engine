@@ -6,13 +6,10 @@ from sqlalchemy.ext.asyncio import (
     async_sessionmaker,
     create_async_engine,
 )
-from sqlalchemy.orm import DeclarativeBase
-
 from app.core.config import get_settings
+from app.core.orm_base import Base  # noqa: F401 — re-export for `from app.core.db import Base`
 
-
-class Base(DeclarativeBase):
-    pass
+__all__ = ["Base", "get_async_session", "get_db", "get_engine"]
 
 
 _engine: AsyncEngine | None = None

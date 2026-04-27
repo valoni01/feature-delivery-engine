@@ -68,7 +68,8 @@ class TestTrackAgentRun:
         mock_session.__aenter__ = AsyncMock(return_value=mock_session)
         mock_session.__aexit__ = AsyncMock(return_value=False)
 
-        with patch("app.agents.base.async_session", return_value=mock_session):
+        session_maker = MagicMock(return_value=mock_session)
+        with patch("app.agents.base.get_async_session", return_value=session_maker):
             async with track_agent_run(
                 workflow_id=1,
                 agent_name="test",

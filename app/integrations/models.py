@@ -4,7 +4,7 @@ from sqlalchemy import Boolean, DateTime, ForeignKey, String, Text, func
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column
 
-from app.core.db import Base
+from app.core.orm_base import Base
 
 
 class ServiceIntegration(Base):
