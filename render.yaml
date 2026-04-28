@@ -4,7 +4,8 @@ services:
     runtime: python
     plan: free
     buildCommand: ./build.sh
-    startCommand: uv run uvicorn app.main:app --host 0.0.0.0 --port $PORT
+    # Migrations at start (not build): DB is only available at runtime
+    startCommand: uv run alembic upgrade head && uv run uvicorn app.main:app --host 0.0.0.0 --port $PORT
     envVars:
       - key: PYTHON_VERSION
         value: "3.12"
