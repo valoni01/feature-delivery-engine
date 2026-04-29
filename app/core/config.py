@@ -10,7 +10,7 @@ _DEFAULT_DATABASE_URL = "postgresql+psycopg://postgres:postgres@localhost:5432/f
 
 
 def _database_url_from_split_postgres_environ() -> str | None:
-    """Build a URL from libpq-style env vars (Railway/Render/Coolify inject these for linked Postgres)."""
+    """Build a URL from libpq-style env vars (Railway injects these when Postgres is linked)."""
     host = os.getenv("PGHOST") or os.getenv("POSTGRES_HOST")
     if not host or not host.strip():
         return None
@@ -106,11 +106,12 @@ class Settings(BaseSettings):
         if not _host_is_loopback(self.sync_database_url):
             return self
         raise ValueError(
-            "Database URL still points to localhost, but the process appears to be running in a "
-            "container or cloud environment. Set DATABASE_URL or POSTGRES_URL to your managed "
-            "Postgres connection string, or link the database service so PGHOST, PGUSER, "
-            "PGPASSWORD, and PGDATABASE are set. In Coolify/Railway, copy the connection string "
-            "from the database resource into this service's environment variables."
+            "Database URL still points to localhost, but this process is running in a container "
+            "or cloud (e.g. Railway). On Railway: add a Postgres service, open your web service → "
+            "Variables → set DATABASE_URL using a variable reference to the Postgres plugin’s "
+            "connection string (or connect the services so PGHOST/PGUSER/PGPASSWORD/PGDATABASE are "
+            "injected). POSTGRES_URL is also accepted. "
+            "https://docs.railway.com/databases/postgresql"
         )
 
     @property

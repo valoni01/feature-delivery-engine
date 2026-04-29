@@ -144,7 +144,7 @@ cp .env.example .env
 
 | Variable | Description | Default |
 |----------|-------------|---------|
-| `DATABASE_URL` | PostgreSQL connection string | `postgresql+psycopg://postgres:postgres@localhost:5432/feature_delivery` |
+| `DATABASE_URL` | PostgreSQL connection string (aliases: `POSTGRES_URL`, `POSTGRESQL_URL`) | `postgresql+psycopg://postgres:postgres@localhost:5432/feature_delivery` |
 | `ENVIRONMENT` | `development` / `production` | `development` |
 | `OPENAI_API_KEY` | OpenAI API key | — |
 | `GITHUB_TOKEN` | Fallback GitHub PAT for repo operations | — |
@@ -152,6 +152,12 @@ cp .env.example .env
 | `OTEL_EXPORTER_OTLP_ENDPOINT` | OpenTelemetry collector endpoint | — |
 | `OTEL_EXPORTER_OTLP_HEADERS` | OTel exporter headers (`Key=Value,...`) | — |
 | `SENTRY_DSN` | Sentry error tracking DSN | — |
+
+### Railway
+
+1. Add a **PostgreSQL** database in the same Railway project.
+2. On the **API service** → **Variables**: set `DATABASE_URL` via **variable reference** to the Postgres service’s `DATABASE_URL`, or link the services so Railway injects `PGHOST` / `PGUSER` / `PGPASSWORD` / `PGDATABASE`. Avoid an empty `DATABASE_URL` placeholder.
+3. Use a start command that runs migrations then the app (see `railway.toml` and `Procfile`). The backend normalizes `postgres://` URLs and can build a URL from split `PG*` vars when Postgres is linked.
 
 ### Database
 
